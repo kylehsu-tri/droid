@@ -56,11 +56,15 @@ class VLAPolicy:
                                                             "varied_camera"][3],
         }
 
-        image = obs['camera/image/varied_camera_1_left_image']
+        images = {
+            "primary": obs["camera/image/varied_camera_1_left_image"],
+            "secondary": obs["camera/image/varied_camera_2_left_image"],
+            "wrist": obs["camera/image/hand_camera_left_image"],
+        }
 
         action = requests.post(
             "http://0.0.0.0:8000/act",
-            json={"image": image, "instruction": "pick up can"}
+            json={"images": images, "instruction": "put marker in cup"}
         ).json()
 
         cartesian_velocity = action[:6]
