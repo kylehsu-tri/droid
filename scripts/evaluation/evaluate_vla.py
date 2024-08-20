@@ -15,17 +15,6 @@ from droid.user_interface.data_collector import DataCollecter
 from droid.user_interface.gui import RobotGUI
 from droid.data_processing.timestep_processing import TimestepProcesser
 
-policy_action_space = "cartesian_velocity"
-policy_camera_kwargs = {}
-
-dir_path = os.path.dirname(os.path.realpath(__file__))
-exp_name = "debug_vla_put_marker_in_cup"
-save_data = False
-log_dir = os.path.join(dir_path, "../../evaluation_logs", exp_name)
-
-env = RobotEnv(action_space=policy_action_space, camera_kwargs=policy_camera_kwargs)
-controller = VRPolicy()
-
 
 class VLAPolicy:
     def __init__(
@@ -45,7 +34,9 @@ class VLAPolicy:
     def forward(self, obs):
         if len(self.action_cache) > 0:
             print(f"Cache size {len(self.action_cache)}")
-            return self.action_cache.pop(0)
+            action = self.action_cache.pop(0)
+            print(f"gripper position: {action[-1]}")
+            return action
 
         proprio = np.array(obs["robot_state"]["cartesian_position"] + [obs["robot_state"]["gripper_position"]])
         processed_timestep = self.timestep_processor.forward({"observation": obs})
@@ -80,12 +71,36 @@ class VLAPolicy:
         gripper_positions = 1 - actions[:, 6:7]
         actions = np.concatenate([cartesian_velocities, gripper_positions], axis=1)
         self.action_cache = [a for a in actions]
-        return self.action_cache.pop(0)
+        action = self.action_cache.pop(0)
+        print(f"gripper position: {action[-1]}")
+        return action
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--action_chunk", type=int, default=1)
+    parser.add_argument("--policy_action_space", type=str, default="cartesian_velocity")
+    parser.add_argument("--gripper_action_space", type=str, default="position")
+    parser.add_argument("--random_reset", type=bool, default=False)
     args = parser.parse_args()
+
+    import pprint
+    pprint.pprint(args)
+
+    policy_camera_kwargs = {}
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    exp_name = "debug_vla_put_marker_in_cup"
+    save_data = False
+    log_dir = os.path.join(dir_path, "../../evaluation_logs", exp_name)
+
+    env = RobotEnv(
+        action_space=args.policy_action_space,
+        gripper_action_space=args.gripper_action_space,
+        camera_kwargs=policy_camera_kwargs,
+        random_reset=args.random_reset
+    )
+    controller = VRPolicy()
 
     policy = VLAPolicy(action_chunk=args.action_chunk)
 

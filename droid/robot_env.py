@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import gym
+import ipdb
 import numpy as np
 
 from droid.calibration.calibration_utils import load_calibration_info
@@ -13,7 +14,8 @@ from droid.misc.transformations import change_pose_frame
 
 
 class RobotEnv(gym.Env):
-    def __init__(self, action_space="cartesian_velocity", gripper_action_space=None, camera_kwargs={}, do_reset=True):
+    def __init__(self, action_space="cartesian_velocity", gripper_action_space="velocity", camera_kwargs={},
+                 do_reset=True, random_reset=True):
         # Initialize Gym Environment
         super().__init__()
 
@@ -25,8 +27,11 @@ class RobotEnv(gym.Env):
 
         # Robot Configuration
         self.reset_joints = np.array([0, -1 / 5 * np.pi, 0, -4 / 5 * np.pi, 0, 3 / 5 * np.pi, 0.0])
-        self.randomize_low = np.array([-0.1, -0.2, -0.1, -0.3, -0.3, -0.3])
-        self.randomize_high = np.array([0.1, 0.2, 0.1, 0.3, 0.3, 0.3])
+        if random_reset:
+            self.randomize_low = np.array([-0.1, -0.2, -0.1, -0.3, -0.3, -0.3])
+            self.randomize_high = np.array([0.1, 0.2, 0.1, 0.3, 0.3, 0.3])
+        else:
+            self.randomize_low = self.randomize_high = np.zeros_like(self.reset_joints)
         self.DoF = 7 if ("cartesian" in action_space) else 8
         self.control_hz = 15
 
@@ -72,7 +77,7 @@ class RobotEnv(gym.Env):
 
         self._robot.update_joints(self.reset_joints, velocity=False, blocking=True, cartesian_noise=noise)
 
-    def update_robot(self, action, action_space="cartesian_velocity", gripper_action_space=None, blocking=False):
+    def update_robot(self, action, action_space, gripper_action_space, blocking=False):
         action_info = self._robot.update_command(
             action,
             action_space=action_space,
@@ -82,7 +87,11 @@ class RobotEnv(gym.Env):
         return action_info
 
     def create_action_dict(self, action):
-        return self._robot.create_action_dict(action)
+        return self._robot.create_action_dict(
+            action,
+            action_space=self.action_space,
+            gripper_action_space=self.gripper_action_space
+        )
 
     def read_cameras(self):
         return self.camera_reader.read_cameras()
