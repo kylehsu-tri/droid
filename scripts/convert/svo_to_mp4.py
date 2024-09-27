@@ -6,7 +6,7 @@ import cv2
 from tqdm import tqdm
 
 from droid.camera_utils.recording_readers.svo_reader import SVOReader
-from droid.data_loading.trajectory_sampler import collect_data_folderpaths
+from droid.data_loading.trajectory_sampler import crawler
 
 
 def convert_svo_to_mp4(filepath, recording_folderpath):
@@ -46,56 +46,74 @@ def convert_svo_to_mp4(filepath, recording_folderpath):
         json.dump(received_timestamps, jsonFile)
 
 
-corrupted_traj = []
-all_folderpaths = collect_data_folderpaths()
-for folderpath in tqdm(all_folderpaths):
-    recording_folderpath = os.path.join(folderpath, "recordings")
-    mp4_folderpath = os.path.join(recording_folderpath, "MP4")
-    svo_folderpath = os.path.join(recording_folderpath, "SVO")
-    if not os.path.exists(mp4_folderpath):
-        os.makedirs(mp4_folderpath)
-    if not os.path.exists(svo_folderpath):
-        os.makedirs(svo_folderpath)
+def collect_data_folderpaths(data_dir, remove_failures=True, filter_func=None):
+    # Prepare Data Folder #
+    # dir_path = os.path.dirname(os.path.realpath(__file__))
+    # data_dir = os.path.join(dir_path, "../../data")
+    # if remove_failures:
+    #     data_dir = os.path.join(data_dir, "success")
 
-    # Move Files To New Location #
-    svo_files_to_move = glob.glob(recording_folderpath + "/*.svo")
-    for f in svo_files_to_move:
-        path_list = f.split("/")
-        path_list.insert(len(path_list) - 1, "SVO")
-        new_f = "/".join(path_list)
-        os.rename(f, new_f)
+    # Collect #
+    all_folderpaths = crawler(data_dir, filter_func=filter_func)
 
-    # Gather Files To Convert #
-    svo_filepaths = glob.glob(svo_folderpath + "/*.svo")
-    mp4_filepaths = glob.glob(mp4_folderpath + "/*.mp4")
-    files_to_convert = []
-    for f in svo_filepaths:
-        serial_number = f.split("/")[-1][:-4]
-        if not any([serial_number in f for f in mp4_filepaths]):
-            files_to_convert.append(f)
+    # Return Paths #
+    return all_folderpaths
 
-    for f in mp4_filepaths:
-        timestamp_filepath = f[:-4] + "_timestamps.json"
-        if not os.path.exists(timestamp_filepath):
-            files_to_convert.append(f)
 
-        reader = cv2.VideoCapture(f)
-        if reader.isOpened():
-            reader.release()
-        else:
-            files_to_convert.append(f)
+if __name__ == "__main__":
+    corrupted_traj = []
+    eval_dir = "/home/ashwinbalakrishna/kylehsu/evals"
+    # data_dir = "/home/ashwinbalakrishna/kylehsu/data"
+    print(f"Converting SVOs to MP4s under {eval_dir}")
+    all_folderpaths = collect_data_folderpaths(eval_dir)
+    for folderpath in tqdm(all_folderpaths):
+        recording_folderpath = os.path.join(folderpath, "recordings")
+        mp4_folderpath = os.path.join(recording_folderpath, "MP4")
+        svo_folderpath = os.path.join(recording_folderpath, "SVO")
+        if not os.path.exists(mp4_folderpath):
+            os.makedirs(mp4_folderpath)
+        if not os.path.exists(svo_folderpath):
+            os.makedirs(svo_folderpath)
 
-    # Convert Files #
-    for f in files_to_convert:
-        convert_svo_to_mp4(f, recording_folderpath)
+        # Move Files To New Location #
+        svo_files_to_move = glob.glob(recording_folderpath + "/*.svo")
+        for f in svo_files_to_move:
+            path_list = f.split("/")
+            path_list.insert(len(path_list) - 1, "SVO")
+            new_f = "/".join(path_list)
+            os.rename(f, new_f)
 
-    # Check Success #
-    num_mp4 = len(glob.glob(mp4_folderpath + "/*.mp4"))
-    num_svo = len(svo_filepaths)
+        # Gather Files To Convert #
+        svo_filepaths = glob.glob(svo_folderpath + "/*.svo")
+        mp4_filepaths = glob.glob(mp4_folderpath + "/*.mp4")
+        files_to_convert = []
+        for f in svo_filepaths:
+            serial_number = f.split("/")[-1][:-4]
+            if not any([serial_number in f for f in mp4_filepaths]):
+                files_to_convert.append(f)
 
-    if num_svo > num_mp4:
-        corrupted_traj.append(folderpath)
+        for f in mp4_filepaths:
+            timestamp_filepath = f[:-4] + "_timestamps.json"
+            if not os.path.exists(timestamp_filepath):
+                files_to_convert.append(f)
 
-print("The following trajectories are corrupted: ")
-for folderpath in corrupted_traj:
-    print(folderpath)
+            reader = cv2.VideoCapture(f)
+            if reader.isOpened():
+                reader.release()
+            else:
+                files_to_convert.append(f)
+
+        # Convert Files #
+        for f in files_to_convert:
+            convert_svo_to_mp4(f, recording_folderpath)
+
+        # Check Success #
+        num_mp4 = len(glob.glob(mp4_folderpath + "/*.mp4"))
+        num_svo = len(svo_filepaths)
+
+        if num_svo > num_mp4:
+            corrupted_traj.append(folderpath)
+
+    print("The following trajectories are corrupted: ")
+    for folderpath in corrupted_traj:
+        print(folderpath)

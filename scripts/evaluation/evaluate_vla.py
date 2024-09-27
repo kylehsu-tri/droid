@@ -1,6 +1,7 @@
 import ipdb
 import os
 import argparse
+import pathlib
 
 import requests
 import json_numpy
@@ -62,7 +63,8 @@ class VLAPolicy:
                 "images": images,
                 "proprio": proprio,
                 "instruction": "put marker in cup",
-                "action_chunk": self.action_chunk
+                "action_chunk": self.action_chunk,
+                "unnorm_key": "droid_put_marker_in_cup"
             }
         ).json()
         assert actions.ndim == 2
@@ -70,14 +72,16 @@ class VLAPolicy:
         cartesian_velocities = actions[:, :6]
         gripper_positions = 1 - actions[:, 6:7]
         actions = np.concatenate([cartesian_velocities, gripper_positions], axis=1)
+        actions = np.clip(actions, -1, 1)       # asserted by RobotEnv
         self.action_cache = [a for a in actions]
         action = self.action_cache.pop(0)
-        print(f"gripper position: {action[-1]}")
+        # print(f"gripper position: {action[-1]}")
         return action
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--eval_uid", type=str)
     parser.add_argument("--action_chunk", type=int, default=1)
     parser.add_argument("--policy_action_space", type=str, default="cartesian_velocity")
     parser.add_argument("--gripper_action_space", type=str, default="position")
@@ -89,10 +93,8 @@ if __name__ == "__main__":
 
     policy_camera_kwargs = {}
 
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    exp_name = "debug_vla_put_marker_in_cup"
-    save_data = False
-    log_dir = os.path.join(dir_path, "../../evaluation_logs", exp_name)
+    save_data = True
+    log_dir = pathlib.Path("/home/ashwinbalakrishna/kylehsu/evals") / args.eval_uid
 
     env = RobotEnv(
         action_space=args.policy_action_space,

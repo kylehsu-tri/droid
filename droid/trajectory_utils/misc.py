@@ -245,7 +245,7 @@ def calibrate_camera(
         calib_pose = calibration_traj(i * step_size, hand_camera=hand_camera)
         desired_pose = change_pose_frame(calib_pose, pose_origin)
         action = np.concatenate([desired_pose, [0]])
-        env.update_robot(action, action_space="cartesian_position", blocking=False)
+        env.update_robot(action, action_space="cartesian_position", gripper_action_space="velocity", blocking=False)
 
         # Regularize Control Frequency #
         comp_time = time.time() - start_time
@@ -291,7 +291,7 @@ def replay_trajectory(
             init_joint_position = timestep["observation"]["robot_state"]["joint_positions"]
             init_gripper_position = timestep["observation"]["robot_state"]["gripper_position"]
             action = np.concatenate([init_joint_position, [init_gripper_position]])
-            env.update_robot(action, action_space="joint_position", blocking=True)
+            env.update_robot(action, action_space="joint_position", gripper_action_space="position", blocking=True)
 
         # TODO: Assert Replayability #
         # robot_state = env.get_state()[0]
